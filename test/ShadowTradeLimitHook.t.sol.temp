@@ -208,6 +208,58 @@ contract ShadowTradeLimitHookTest is Test, Deployers, CoFheTest {
     
     // ============ ORDER PLACEMENT TESTS ============
     
+    function testPlaceBasicLimitOrder() public {
+        (
+            InEuint128 memory triggerPrice,
+            InEuint128 memory orderSize,
+            InEuint8 memory direction,
+            InEuint64 memory expirationTime,
+            InEuint128 memory minFillSize,
+            InEbool memory partialFillAllowed
+        ) = _createMockEncryptedInputs();
+        
+        vm.startPrank(trader1);
+        
+        // Expect event emission
+        vm.expectEmit(true, true, true, false);
+        emit ShadowOrderPlaced(bytes32(0), trader1, poolId, block.timestamp);
+        
+        bytes32 orderId = hook.placeShadowLimitOrder(
+            poolKey,
+            triggerPrice,
+            orderSize,
+            direction,
+            expirationTime,
+            minFillSize,
+            partialFillAllowed
+        );
+        
+        vm.stopPrank();
+        
+        // Verify order was stored
+        assertNotEq(orderId, bytes32(0));
+        
+        // Verify order details (note: encrypted values can't be directly compared)
+        (
+            euint128 storedTriggerPrice,
+            euint128 storedOrderSize,
+            euint8 storedDirection,
+            euint128 storedFilledAmount,
+            euint64 storedExpirationTime,
+            euint32 storedOrderType,
+            euint128 storedMinFillSize,
+            ebool storedIsActive,
+            ebool storedPartialFillAllowed,
+            address storedOwner
+        ) = hook.shadowOrders(orderId);
+        
+        assertEq(storedOwner, trader1);
+        
+        // Verify order is in user's order list
+        bytes32[] memory userOrders = hook.getUserOrderIds(trader1);
+        assertEq(userOrders.length, 1);
+        assertEq(userOrders[0], orderId);
+    }
     
     function testPlaceMultipleLimitOrders() public {
         // Place multiple orders from same user
@@ -337,7 +389,30 @@ contract ShadowTradeLimitHookTest is Test, Deployers, CoFheTest {
     
     // ============ HOOK INTEGRATION TESTS ============
     
+    function testHookTriggeredOnSwap() public {
+        // Place a test order first
+        vm.prank(trader1);
+        _placeTestOrder(trader1);
+        
+        // Perform a swap to trigger hook
+        _performSwap(true, 1 ether);
+        
+        // Hook should have been called (verified by successful transaction)
+        // More detailed execution testing would require FHE decryption mocking
+    }
     
+    function testMultipleOrdersProcessing() public {
+        // Place multiple orders
+        _placeOrderForUser(trader1);
+        _placeOrderForUser(trader2);
+        _placeOrderForUser(trader3);
+        
+        // Perform swap that should trigger order processing
+        _performSwap(false, -1 ether);
+        
+        // Verify transaction completes successfully
+        // In a full implementation, we'd verify specific order executions
+    }
     
     // ============ EDGE CASES AND ERROR HANDLING ============
     
@@ -367,6 +442,21 @@ contract ShadowTradeLimitHookTest is Test, Deployers, CoFheTest {
     
     // ============ PERFORMANCE TESTS ============
     
+    function testGasUsageOrderPlacement() public {
+        vm.startPrank(trader1);
+        
+        uint256 gasBefore = gasleft();
+        _placeTestOrder(trader1);
+        uint256 gasUsed = gasBefore - gasleft();
+        
+        vm.stopPrank();
+        
+        // Log gas usage for optimization analysis
+        console2.log("Gas used for order placement:", gasUsed);
+        
+        // Set reasonable gas limit expectations
+        assertLt(gasUsed, 2000000); // Should be less than 2M gas for FHE operations
+    }
     
     function testBatchOrderProcessing() public {
         // Place multiple orders
@@ -386,7 +476,42 @@ contract ShadowTradeLimitHookTest is Test, Deployers, CoFheTest {
     
     // ============ INTEGRATION WITH UNISWAP V4 ============
     
+    function testHookDoesNotInterruptNormalSwaps() public {
+        // Record initial balances
+        uint256 trader1Token0Before = token0.balanceOf(trader1);
+        uint256 trader1Token1Before = token1.balanceOf(trader1);
+        
+        // Perform normal swap
+        vm.prank(trader1);
+        _performSwap(true, 1 ether);
+        
+        // Verify swap occurred normally
+        uint256 trader1Token0After = token0.balanceOf(trader1);
+        uint256 trader1Token1After = token1.balanceOf(trader1);
+        
+        assertLt(trader1Token0After, trader1Token0Before); // Spent token0
+        assertGt(trader1Token1After, trader1Token1Before); // Received token1
+    }
     
+    function testHookWorksWithLiquidityChanges() public {
+        // Add more liquidity
+        modifyLiquidityRouter.modifyLiquidity(
+            poolKey,
+            ModifyLiquidityParams({
+                tickLower: -887220,
+                tickUpper: 887220,
+                liquidityDelta: 500 ether,
+                salt: 0
+            }),
+            ZERO_BYTES
+        );
+        
+        // Place orders and verify they work with increased liquidity
+        _placeOrderForUser(trader1);
+        _performSwap(true, 2 ether);
+        
+        // Should complete without issues
+    }
     
     // ============ INVARIANT TESTS ============
     
