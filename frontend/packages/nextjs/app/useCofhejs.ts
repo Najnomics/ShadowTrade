@@ -339,3 +339,21 @@ export const useCofhejsPermitIssuer = () => {
     return permit.issuer;
   }, [permit]);
 };
+
+/**
+ * Main hook to access cofhejs client and initialization status
+ * @returns Object containing cofhe client and ready status
+ * This is the primary hook used by other components for FHE operations
+ */
+export const useCofhejs = () => {
+  const initialized = useCofhejsInitialized();
+  const cofhe = useMemo(() => {
+    if (!initialized) return null;
+    return cofhejs;
+  }, [initialized]);
+
+  return {
+    cofhe,
+    isCofheReady: initialized,
+  };
+};
