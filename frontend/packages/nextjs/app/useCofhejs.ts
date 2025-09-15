@@ -22,6 +22,8 @@ const ChainEnvironments = {
   [chains.arbitrumSepolia.id]: "TESTNET",
   // Hardhat
   [chains.hardhat.id]: "MOCK",
+  // Anvil (localhost)
+  31337: "MOCK",
 } as const;
 
 // ZKV SIGNER

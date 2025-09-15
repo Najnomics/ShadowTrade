@@ -1,0 +1,108 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.26;
+
+import {Script} from "forge-std/Script.sol";
+import {console2} from "forge-std/console2.sol";
+import {ShadowTradeLimitHook} from "../src/ShadowTradeLimitHook.sol";
+import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
+import {FHE, InEuint128, InEuint64, InEuint8, InEbool} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
+
+contract TestFHEOrderScript is Script {
+    ShadowTradeLimitHook hook = ShadowTradeLimitHook(0x1cC3CBE6469dDc151864B4aFcC7e60d13BB540C0);
+    MockERC20 weth = MockERC20(0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0);
+    MockERC20 usdc = MockERC20(0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9);
+    
+    function run() external {
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        address deployer = vm.addr(deployerPrivateKey);
+        
+        console2.log("=== Testing FHE Order Placement ===");
+        console2.log("Deployer:", deployer);
+        console2.log("Hook:", address(hook));
+        
+        vm.startBroadcast(deployerPrivateKey);
+        
+        // Test FHE encryption/decryption process
+        console2.log("Testing FHE operations...");
+        
+        // Create test values
+        uint256 testPrice = 2000 * 1e6; // 2000 USDC per ETH
+        uint256 testSize = 1 ether;     // 1 ETH
+        uint8 testDirection = 0;        // BUY
+        uint64 testExpiration = uint64(block.timestamp + 1 hours);
+        uint256 testMinFill = 0.1 ether; // 0.1 ETH minimum
+        bool testPartialFill = true;
+        
+        console2.log("Test values:");
+        console2.log("- Price:", testPrice);
+        console2.log("- Size:", testSize);
+        console2.log("- Direction:", testDirection);
+        console2.log("- Expiration:", testExpiration);
+        console2.log("- Min Fill:", testMinFill);
+        console2.log("- Partial Fill Allowed:", testPartialFill);
+        
+        // Test FHE encryption (in mock environment, these might be plain values)
+        InEuint128 memory encryptedPrice = FHE.asEuint128(testPrice);
+        InEuint128 memory encryptedSize = FHE.asEuint128(testSize);
+        InEuint8 memory encryptedDirection = FHE.asEuint8(testDirection);
+        InEuint64 memory encryptedExpiration = FHE.asEuint64(testExpiration);
+        InEuint128 memory encryptedMinFill = FHE.asEuint128(testMinFill);
+        InEbool memory encryptedPartialFill = FHE.asEbool(testPartialFill);
+        
+        console2.log("FHE encryption completed");
+        
+        // Approve tokens to hook
+        weth.approve(address(hook), type(uint256).max);
+        usdc.approve(address(hook), type(uint256).max);
+        console2.log("Token approvals completed");
+        
+        // Get execution fee
+        uint256 executionFee = hook.executionFeeBps();
+        console2.log("Execution fee (bps):", executionFee);
+        
+        // Try to place the order with proper FHE inputs
+        console2.log("Placing shadow order...");
+        
+        bytes32 orderId = hook.placeShadowLimitOrder{value: 0.001 ether}(
+            encryptedPrice,
+            encryptedSize,
+            encryptedDirection,
+            encryptedExpiration,
+            encryptedMinFill,
+            encryptedPartialFill,
+            address(weth),
+            address(usdc)
+        );
+        
+        console2.log("Order placed successfully!");
+        console2.log("Order ID:", vm.toString(orderId));
+        
+        // Test reading the order back
+        console2.log("Reading order data...");
+        
+        // Test getting user orders
+        bytes32[] memory userOrders = hook.getUserOrderIds(deployer);
+        console2.log("User has", userOrders.length, "orders");
+        
+        if (userOrders.length > 0) {
+            console2.log("First order ID:", vm.toString(userOrders[0]));
+            
+            // Try to get order details
+            (
+                ShadowTradeLimitHook.ShadowLimitOrder memory orderData,
+                address owner,
+                bytes32 poolId
+            ) = hook.getShadowOrder(userOrders[0]);
+            
+            console2.log("Order owner:", owner);
+            console2.log("Pool ID:", vm.toString(poolId));
+            console2.log("Currency0:", orderData.currency0);
+            console2.log("Currency1:", orderData.currency1);
+        }
+        
+        vm.stopBroadcast();
+        
+        console2.log("\n=== FHE Order Test Complete ===");
+        console2.log("Contract interactions tested successfully");
+    }
+}

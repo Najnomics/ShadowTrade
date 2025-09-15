@@ -8,15 +8,15 @@
 import { useCallback, useState, useEffect } from "react";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import { Address, encodeFunctionData, decodeFunctionResult, parseAbi } from "viem";
-import { OrderFormData, TradingPair, OrderInfo, UsePlaceOrderReturn, UseCancelOrderReturn } from "~~/types/shadowtrade";
+import { OrderFormData, TradingPair, OrderInfo, UsePlaceOrderReturn, UseCancelOrderReturn, OrderStatus } from "~~/types/shadowtrade";
 import { useEncryptOrderParams } from "./useEncryptOrderParams";
 import { getCurrentConfig, ERROR_MESSAGES, SUCCESS_MESSAGES } from "~~/utils/shadowtrade/config";
 import { notification } from "~~/utils/scaffold-eth";
 
 // ShadowTrade Contract ABI (simplified for key functions)
 const SHADOWTRADE_ABI = parseAbi([
-  // Order placement
-  "function placeShadowLimitOrder((bytes,uint256) triggerPrice, (bytes,uint256) orderSize, (bytes,uint256) direction, (bytes,uint256) expirationTime, (bytes,uint256) minFillSize, (bytes,uint256) partialFillAllowed, address currency0, address currency1) external payable returns (bytes32)",
+  // Order placement - using bytes arrays for FHE encrypted data
+  "function placeShadowLimitOrder(bytes triggerPrice, bytes orderSize, bytes direction, bytes expirationTime, bytes minFillSize, bytes partialFillAllowed, address currency0, address currency1) external payable returns (bytes32)",
   
   // Order management
   "function cancelShadowOrder(bytes32 orderId) external",
@@ -32,8 +32,7 @@ const SHADOWTRADE_ABI = parseAbi([
   "function getOrderFillInfo(bytes32 orderId) external view returns (uint256, uint256, uint256, uint256)",
   
   // Configuration
-  "function executionFee() external view returns (uint256)",
-  "function paused() external view returns (bool)",
+  "function executionFeeBps() external view returns (uint256)",
   
   // Events
   "event ShadowOrderPlaced(bytes32 indexed orderId, address indexed user, bytes32 indexed poolId)",
@@ -77,22 +76,11 @@ export const useShadowTradeContract = () => {
       setError(null);
 
       try {
-        // Check if hook is paused
-        const isPaused = await publicClient.readContract({
-          address: hookAddress,
-          abi: SHADOWTRADE_ABI,
-          functionName: "paused",
-        }) as boolean;
-
-        if (isPaused) {
-          throw new Error(ERROR_MESSAGES.HOOK_PAUSED);
-        }
-
         // Get execution fee
         const executionFee = await publicClient.readContract({
           address: hookAddress,
           abi: SHADOWTRADE_ABI,
-          functionName: "executionFee",
+          functionName: "executionFeeBps",
         }) as bigint;
 
         console.log("Execution fee:", executionFee.toString());
@@ -108,12 +96,12 @@ export const useShadowTradeContract = () => {
             abi: SHADOWTRADE_ABI,
             functionName: "placeShadowLimitOrder",
             args: [
-              encryptedInputs.triggerPrice,
-              encryptedInputs.orderSize,
-              encryptedInputs.direction,
-              encryptedInputs.expirationTime,
-              encryptedInputs.minFillSize,
-              encryptedInputs.partialFillAllowed,
+              `0x${Buffer.from(encryptedInputs.triggerPrice.data).toString('hex')}`,
+              `0x${Buffer.from(encryptedInputs.orderSize.data).toString('hex')}`,
+              `0x${Buffer.from(encryptedInputs.direction.data).toString('hex')}`,
+              `0x${Buffer.from(encryptedInputs.expirationTime.data).toString('hex')}`,
+              `0x${Buffer.from(encryptedInputs.minFillSize.data).toString('hex')}`,
+              `0x${Buffer.from(encryptedInputs.partialFillAllowed.data).toString('hex')}`,
               tradingPair.currency0,
               tradingPair.currency1,
             ],
@@ -267,8 +255,8 @@ export const useShadowTradeContract = () => {
       // Parse the returned data into OrderInfo structure
       // Note: This is a simplified version - actual implementation would need
       // proper type casting and error handling
-      const [encryptedData, owner, poolId, currency0, currency1, createdAt, lastUpdated] = orderData as any[];
-      const [totalFilled, remainingSize, averageExecutionPrice, fillCount] = fillInfo as any[];
+      const [encryptedData, owner, poolId, currency0, currency1, createdAt, lastUpdated] = orderData as unknown as any[];
+      const [totalFilled, remainingSize, averageExecutionPrice, fillCount] = fillInfo as unknown as any[];
 
       const orderInfo: OrderInfo = {
         orderId,
@@ -278,7 +266,7 @@ export const useShadowTradeContract = () => {
         currency1: currency1 as Address,
         createdAt,
         lastUpdated,
-        status: remainingSize === 0n ? "completed" : totalFilled > 0n ? "partially_filled" : "active",
+        status: remainingSize === 0n ? OrderStatus.COMPLETED : totalFilled > 0n ? OrderStatus.PARTIALLY_FILLED : OrderStatus.ACTIVE,
         totalFilled,
         remainingSize,
         averageExecutionPrice,

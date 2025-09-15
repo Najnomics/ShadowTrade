@@ -6,12 +6,12 @@
 import { Address } from "viem";
 import { TradingPair, ShadowTradeConfig } from "~~/types/shadowtrade";
 
-// Contract addresses (will be updated after deployment)
+// Contract addresses (updated with deployed addresses)
 export const SHADOWTRADE_ADDRESSES = {
   // Local/Development
   localhost: {
-    hookAddress: "0x0000000000000000000000000000000000000000" as Address,
-    poolManager: "0x0000000000000000000000000000000000000000" as Address,
+    hookAddress: "0x1cC3CBE6469dDc151864B4aFcC7e60d13BB540C0" as Address,
+    poolManager: "0x5FbDB2315678afecb367f032d93F642f64180aa3" as Address,
   },
   // Fhenix Testnet
   fhenix: {
@@ -28,10 +28,10 @@ export const SHADOWTRADE_ADDRESSES = {
 // Common token addresses
 export const TOKEN_ADDRESSES = {
   localhost: {
-    WETH: "0x0000000000000000000000000000000000000000" as Address,
-    USDC: "0x0000000000000000000000000000000000000000" as Address,
-    WBTC: "0x0000000000000000000000000000000000000000" as Address,
-    DAI: "0x0000000000000000000000000000000000000000" as Address,
+    WETH: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0" as Address,
+    USDC: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9" as Address,
+    WBTC: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9" as Address,
+    DAI: "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707" as Address,
   },
   fhenix: {
     WETH: "0x0000000000000000000000000000000000000000" as Address,
