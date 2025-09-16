@@ -2,22 +2,22 @@
 pragma solidity ^0.8.25;
 
 import {Script, console2} from "forge-std/Script.sol";
-import {HybridFHERC20Simple} from "../src/HybridFHERC20Simple.sol";
+import {HybridFHERC20} from "../src/HybridFHERC20.sol";
 
-contract DeploySimple is Script {
+contract DeployHybridFHERC20Simple is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
         
-        console2.log("Deploying HybridFHERC20Simple with deployer:", deployer);
+        console2.log("Deploying HybridFHERC20 with deployer:", deployer);
         console2.log("Deployer balance:", deployer.balance);
         
         vm.startBroadcast(deployerPrivateKey);
         
-        // Deploy the HybridFHERC20Simple token
-        HybridFHERC20Simple token = new HybridFHERC20Simple("ShadowTrade Token", "SHT");
+        // Deploy the HybridFHERC20 token
+        HybridFHERC20 token = new HybridFHERC20("ShadowTrade Token", "SHT");
         
-        console2.log("HybridFHERC20Simple deployed at:", address(token));
+        console2.log("HybridFHERC20 deployed at:", address(token));
         
         // Mint some initial tokens to the deployer
         token.mint(deployer, 1000000 * 10**18);

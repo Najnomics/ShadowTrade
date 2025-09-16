@@ -15,7 +15,7 @@ fs_permissions = [{ access = "read-write", path = ".forge-snapshots/"}]
 [rpc_endpoints]
 mainnet = "https://eth-mainnet.alchemyapi.io/v2/${ALCHEMY_KEY}"
 sepolia = "https://eth-sepolia.alchemyapi.io/v2/${ALCHEMY_KEY}"
-fhenix = "https://api.helium.fhenix.zone"
+fhenix = "https://fhenode.fhenix.io/new/evm"
 
 # Coverage profile with IR optimizer to avoid stack too deep errors
 [profile.coverage]
