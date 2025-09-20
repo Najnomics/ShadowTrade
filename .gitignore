@@ -38,6 +38,7 @@ typechain/
 typechain-types/
 
 context/
+frontend/
 
 .claude/
 
